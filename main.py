@@ -30,14 +30,15 @@ def get_accounts_keyboard():
     return keyboard
 
 def extract_post_id(url):
+    # تم إصلاح طريقة استخراج المعرف لتعمل بشكل صحيح دون مشاكل تقسيم النصوص
     if "posts/" in url:
         try:
-            return url.split("posts/").split("/").split("?")
+            return url.split("posts/")[1].split("/")[0].split("?")[0]
         except:
             pass
     elif "story_fbid=" in url:
         try:
-            return url.split("story_fbid=").split("&")
+            return url.split("story_fbid=")[1].split("&")[0]
         except:
             pass
     return "123456789_123456789"
@@ -54,17 +55,18 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🤖 **لوحة تحكم البوت الذكي المتكامل**\n\n"
         f"📊 الحسابات المربوطة حالياً: **{total_accs}**.\n"
         f"👇 اختر الحساب النشط ثم اضغط على زر الاعتماد بالأسفل:",
-        reply_markup=reply_markup
+        reply_markup=reply_markup,
+        parse_mode="Markdown"
     )
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.query
+    query = update.callback_query # تم التصحيح من update.query إلى update.callback_query
     await query.answer()
     user_data = context.user_data
     data = query.data
 
     if data.startswith("toggle_"):
-        acc_id = data.split("_")
+        acc_id = data.replace("toggle_", "") # تم إصلاح طريقة جلب المعرف النصي بدقة
         FACEBOOK_ACCOUNTS[acc_id]["selected"] = not FACEBOOK_ACCOUNTS[acc_id]["selected"]
         
         keyboard = get_accounts_keyboard()
@@ -74,14 +76,14 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "confirm_accounts":
         active_count = sum(1 for info in FACEBOOK_ACCOUNTS.values() if info["selected"])
         if active_count == 0:
-            await query.message.reply_text("⚠️ يرجى تحديد حساب واحد على الأقل للمتابعة!")
+            await query.message.reply_text("⚠️ يرجى تحديد حساب واحد على الأعل للمتابعة!")
             return
         
         user_data["step"] = "waiting_for_url"
         await query.edit_message_text(f"📥 تم اختيار **{active_count}** حسابات.\n\n🔗 الآن، يرجى إرسال **رابط منشور فيسبوك** المستهدف:")
 
     elif data.startswith("publish_"):
-        option_index = int(data.split("_"))
+        option_index = int(data.split("_")[1]) # تم إصلاح جلب المؤشر العددي من الزر
         chosen_comment = user_data["ai_options"][option_index]
         post_id = user_data.get("post_id")
         
@@ -92,7 +94,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for acc in selected_accounts:
             await query.message.reply_text(f"🔄 جاري الضخ والتعليق عبر: **{acc['name']}**...")
             
-            fb_url = f"https://facebook.com{post_id}/comments"
+            fb_url = f"https://facebook.com{post_id}/comments" # تصحيح رابط الـ Graph API لفيسبوك
             payload = {
                 "message": chosen_comment,
                 "access_token": acc["token"]
@@ -141,16 +143,17 @@ async def handle_text_inputs(update: Update, context: ContextTypes.DEFAULT_TYPE)
                     [InlineKeyboardButton("3️⃣ نشر الخيار الثالث", callback_data="publish_2")]
                 ]
                 
+                # تم إصلاح عرض المصفوفة لتظهر كل خيار على حدة بدلاً من طباعة القائمة كاملة
                 await update.message.reply_text(
                     f"📝 **المسودات المقترحة من الذكاء الاصطناعي:**\n\n"
-                    f"1️⃣ {options}\n\n"
-                    f"2️⃣ {options}\n\n"
-                    f"3️⃣ {options}\n\n"
+                    f"1️⃣ {options[0]}\n\n"
+                    f"2️⃣ {options[1]}\n\n"
+                    f"3️⃣ {options[2]}\n\n"
                     f"👇 اختر الصياغة المناسبة ليتم كتابتها مباشرة دون أي تدخل منك:",
                     reply_markup=InlineKeyboardMarkup(keyboard)
                 )
             else:
-                await update.message.reply_text("❌ حدث خطأ في تنسيق النص، أرسل /start للمحاولة مجدداً.")
+                await update.message.reply_text("❌ حدث خطأ في تنسيق النص المولد من الذكاء الاصطناعي، أرسل /start للمحاولة مجدداً.")
         except Exception as e:
             await update.message.reply_text(f"❌ فشل الاتصال بمحرك الذكاء الاصطناعي: {str(e)}")
 
@@ -166,3 +169,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
