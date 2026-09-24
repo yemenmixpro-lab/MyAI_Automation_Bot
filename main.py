@@ -30,7 +30,6 @@ def get_accounts_keyboard():
     return keyboard
 
 def extract_post_id(url):
-    # تم إصلاح طريقة استخراج المعرف لتعمل بشكل صحيح دون مشاكل تقسيم النصوص
     if "posts/" in url:
         try:
             return url.split("posts/")[1].split("/")[0].split("?")[0]
@@ -60,14 +59,15 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query # تم التصحيح من update.query إلى update.callback_query
+    query = update.callback_query
     await query.answer()
     user_data = context.user_data
     data = query.data
 
     if data.startswith("toggle_"):
-        acc_id = data.replace("toggle_", "") # تم إصلاح طريقة جلب المعرف النصي بدقة
-        FACEBOOK_ACCOUNTS[acc_id]["selected"] = not FACEBOOK_ACCOUNTS[acc_id]["selected"]
+        acc_id = data.replace("toggle_", "")  # تم الإصلاح هنا ليعمل الزر بشكل صحيح
+        if acc_id in FACEBOOK_ACCOUNTS:
+            FACEBOOK_ACCOUNTS[acc_id]["selected"] = not FACEBOOK_ACCOUNTS[acc_id]["selected"]
         
         keyboard = get_accounts_keyboard()
         keyboard.append([InlineKeyboardButton("➡️ الاعتماد والبدء في إرسال الرابط", callback_data="confirm_accounts")])
@@ -76,14 +76,14 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "confirm_accounts":
         active_count = sum(1 for info in FACEBOOK_ACCOUNTS.values() if info["selected"])
         if active_count == 0:
-            await query.message.reply_text("⚠️ يرجى تحديد حساب واحد على الأعل للمتابعة!")
+            await query.message.reply_text("⚠️ يرجى تحديد حساب واحد على الأقل للمتابعة!")
             return
         
         user_data["step"] = "waiting_for_url"
         await query.edit_message_text(f"📥 تم اختيار **{active_count}** حسابات.\n\n🔗 الآن، يرجى إرسال **رابط منشور فيسبوك** المستهدف:")
 
     elif data.startswith("publish_"):
-        option_index = int(data.split("_")[1]) # تم إصلاح جلب المؤشر العددي من الزر
+        option_index = int(data.replace("publish_", ""))  # تم الإصلاح هنا لجلب رقم الخيار بشكل دقيق
         chosen_comment = user_data["ai_options"][option_index]
         post_id = user_data.get("post_id")
         
@@ -94,7 +94,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for acc in selected_accounts:
             await query.message.reply_text(f"🔄 جاري الضخ والتعليق عبر: **{acc['name']}**...")
             
-            fb_url = f"https://facebook.com{post_id}/comments" # تصحيح رابط الـ Graph API لفيسبوك
+            fb_url = f"https://facebook.com{post_id}/comments"
             payload = {
                 "message": chosen_comment,
                 "access_token": acc["token"]
@@ -143,7 +143,6 @@ async def handle_text_inputs(update: Update, context: ContextTypes.DEFAULT_TYPE)
                     [InlineKeyboardButton("3️⃣ نشر الخيار الثالث", callback_data="publish_2")]
                 ]
                 
-                # تم إصلاح عرض المصفوفة لتظهر كل خيار على حدة بدلاً من طباعة القائمة كاملة
                 await update.message.reply_text(
                     f"📝 **المسودات المقترحة من الذكاء الاصطناعي:**\n\n"
                     f"1️⃣ {options[0]}\n\n"
@@ -153,7 +152,7 @@ async def handle_text_inputs(update: Update, context: ContextTypes.DEFAULT_TYPE)
                     reply_markup=InlineKeyboardMarkup(keyboard)
                 )
             else:
-                await update.message.reply_text("❌ حدث خطأ في تنسيق النص المولد من الذكاء الاصطناعي، أرسل /start للمحاولة مجدداً.")
+                await update.message.reply_text("❌ حدث خطأ في تنسيق النص، أرسل /start للمحاولة مجدداً.")
         except Exception as e:
             await update.message.reply_text(f"❌ فشل الاتصال بمحرك الذكاء الاصطناعي: {str(e)}")
 
@@ -169,4 +168,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
